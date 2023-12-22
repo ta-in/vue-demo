@@ -1,0 +1,173 @@
+<template>
+  <div
+    :class="['scroll-text', `scroll-text-${type == 'col' ? 'col' : 'row'}`]"
+    ref="scroll"
+    @mouseenter="mouseenter"
+    @mouseleave="mouseleave"
+  >
+    <div
+      class="show"
+      ref="show"
+      :style="{ opacity: scrollEnable && scrolling ? 0 : 1 }"
+    >
+      {{ text }}
+    </div>
+    <div
+      class="move"
+      :style="{
+        opacity: scrollEnable && scrolling ? 1 : 0,
+        [type === 'col' ? 'top' : 'left']: offset + 'px',
+      }"
+    >
+      <div class="text" ref="rect">{{ text }}</div>
+      <div
+        class="space"
+        ref="space"
+        :style="{ [type === 'col' ? 'height' : 'width']: space + 'em' }"
+      ></div>
+      <div class="text-copy">{{ text }}</div>
+    </div>
+  </div>
+</template>
+
+<script>
+export default {
+  name: "ScrollText",
+  data() {
+    return {
+      requireID: null,
+      scrolling: false,
+      scrollEnable: false,
+      offset: 0,
+    };
+  },
+  props: {
+    text: { type: String },
+    type: { type: String, default: "row" },
+    trigger: { type: String, default: "hover" },
+    gap: { type: Number },
+    speed: { type: Number },
+    reset: { type: Boolean, default: true },
+  },
+  computed: {
+    space() {
+      const defaultSpace = this.type === "col" ? 1 : 2;
+      return this.gap || defaultSpace;
+    },
+    velocity() {
+      const defaultV = this.type === "col" ? 1 : 0.5;
+      return this.speen || defaultV;
+    },
+  },
+  watch: {
+    text: {
+      immediate: true,
+      handler() {
+        this.$nextTick(() => {
+          this.computeText();
+          if (this.trigger == "auto") this.move();
+        });
+      },
+    },
+  },
+  methods: {
+    computeText() {
+      const $el = this.$refs.scroll,
+        $rect = this.$refs.rect,
+        type = this.type;
+      const size = type == "col" ? $el.clientHeight : $el.clientWidth,
+        mSize = type == "col" ? $rect.clientHeight : $rect.clientWidth;
+
+      let text = this.text,
+        n = 1000; // 防止意外卡死
+      if (mSize > size) {
+        if (type == "col") {
+          const $show = this.$refs.show;
+          while ($show.offsetHeight > size) {
+            if ($show.clientHeight > size * 2 && n > 0) {
+              $show.innerText = text =
+                text.substring(0, Math.floor(text.length / 2)) + "...";
+            } else {
+              $show.innerText = text =
+                text.substring(0, text.length - 4) + "...";
+            }
+            n--;
+          }
+        }
+        this.scrollEnable = true;
+      } else {
+        this.scrollEnable = false;
+      }
+    },
+    move() {
+      if (!this.scrollEnable) return;
+      const $rect = this.$refs.rect,
+        $space = this.$refs.space,
+        type = this.type;
+      const sSize = type == "col" ? $space.clientHeight : $space.clientWidth,
+        mSize = type == "col" ? $rect.clientHeight : $rect.clientWidth;
+      this.scrolling = true;
+      if (this.requireID) cancelAnimationFrame(this.requireID);
+      const scrollText = () => {
+        this.offset -= this.velocity;
+        if (-this.offset > mSize + sSize) this.offset = 0;
+        this.requireID = requestAnimationFrame(scrollText);
+      };
+      scrollText();
+    },
+    mouseenter() {
+      if (this.trigger == "auto") return;
+      this.move(true);
+    },
+    mouseleave() {
+      if (this.trigger == "auto") return;
+      if (this.requireID) {
+        cancelAnimationFrame(this.requireID);
+        if (this.reset) {
+          this.offset = 0;
+          this.scrolling = false;
+        }
+      }
+    },
+  },
+};
+</script>
+
+<style scoped lang="scss">
+.scroll-text {
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  .move {
+    position: absolute;
+    left: 0;
+    top: 0;
+  }
+}
+.scroll-text-row {
+  white-space: nowrap;
+  .show {
+    width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .move div {
+    display: inline-block;
+  }
+}
+.scroll-text-col {
+  height: 100%;
+  word-wrap: break-word;
+  white-space: normal;
+  .show {
+    width: 100%;
+    // height: 100%;
+    // overflow: hidden;
+    // text-overflow: ellipsis;
+  }
+  .move {
+    width: 100%;
+  }
+}
+</style>
